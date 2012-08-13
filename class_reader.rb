@@ -74,7 +74,7 @@ class Utf8Info < ConstantInfo
 	def initialize(f)
 		@length = f.read_u2;
 		@bytes = f.read(@length)
-		puts @bytes
+		#puts @bytes
 	end
 end
 
@@ -112,10 +112,13 @@ class JavaClassReader
 
 	def read
 		read_magic
-		read_minor
+		@minor = @file.read_u2
 		read_major
-		read_pool_count
+		@pool_count = @file.read_u2
 		read_constant_pool
+		@access_flags = @file.read_u2
+		@this_class = @file.read_u2
+		@super_class = @file.read_u2
 	end
 
 	private
@@ -124,32 +127,23 @@ class JavaClassReader
 		raise "Not a class file" if @magic != 0xCAFEBABE
 	end
 
-	def read_minor
-		@minor = @file.read_u2
-	end
-
 	def read_major
 		@major = @file.read_u2
 		raise "Not Java SE 6 class" if @major != 0x32
 	end
 
-	def read_pool_count
-		@pool_count = @file.read_u2
-	end
-
 	def read_constant_pool
-		@constant_pool = []
-		pool_count = @pool_count
-		pool_count.times do
+		@constant_pool = [nil] #zero index is not used, since indexing starts from 1 to pool_count - 1
+		(@pool_count - 1).times do
 			constant_type_id = @file.read_u1
 			constant_class = JavaConstantClasses[constant_type_id]
-			puts constant_class
+			#puts constant_class		
 			constant = constant_class.new(@file)
-				
-				
-			
+			@constant_pool << constant
 		end
 	end
+
+	
 end
 
 BigEndianFile.open("DoWhileExample.class", "rb") do |f|
