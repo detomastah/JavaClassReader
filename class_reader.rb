@@ -12,13 +12,17 @@ class BigEndianFile < File
 	end
 end
 
-class ConstantInfo
+class BaseInfo
+	def initialize(reader, f)
+		@reader = reader
+	end
 end
 
-class FieldRefInfo < ConstantInfo
+class FieldRefInfo < BaseInfo
 	attr_accessor :class_index, :name_and_type_index
 	
-	def initialize(f)
+	def initialize(reader, f)
+		super
 		@class_index = f.read_u2
 		@name_and_type_index = f.read_u2
 	end
@@ -30,36 +34,40 @@ end
 class InterfaceMethodRefInfo < FieldRefInfo
 end
 
-class ClassInfo < ConstantInfo
+class ClassInfo < BaseInfo
 	attr_accessor :name_index
 
-	def initialize(f)
+	def initialize(reader, f)
+		super
 		@name_index = f.read_u2
 	end
 end
 
-class StringInfo < ConstantInfo
+class StringInfo < BaseInfo
 	attr_accessor :string_index
 
-	def initialize(f)
+	def initialize(reader, f)
+		super
 		@string_index = f.read_u2
 	end
 end
 
-class Utf8Info < ConstantInfo
+class Utf8Info < BaseInfo
 	attr_accessor :length, :bytes
 
-	def initialize(f)
+	def initialize(reader, f)
+		super
 		@length = f.read_u2;
 		@bytes = f.read(@length)
 		#puts @bytes
 	end
 end
 
-class NameAndTypeInfo < ConstantInfo
+class NameAndTypeInfo < BaseInfo
 	attr_accessor :name_index, :descriptor_index
 
-	def initialize(f)
+	def initialize(reader, f)
+		super
 		@name_index = f.read_u2;
 		@descriptor_index = f.read_u2
 	end
@@ -82,44 +90,61 @@ JavaConstantClasses = {
 	18 => :CONSTANT_InvokeDynamic
 }
 
-class AttributeInfo
+class AttributeInfo < BaseInfo
 	attr_accessor :attribute_name_index, :attribute_length, :info
-	def initialize(f)
+	def initialize(reader, f)
+		super
 		@attribute_name_index = f.read_u2
 		@attribute_length = f.read_u4
 		@info = f.read(@attribute_length)
 	end
-end
 
-class FieldInfo
-	attr_accessor :access_flags, :name_index, :descriptor_index, :attributes_count, :attributes
-	def initialize(f)
-		@access_flags = f.read_u2
-		@name_index = f.read_u2
-		@descriptor_index = f.read_u2
-		@attributes_count = f.read_u2
-		@attributes = []
-		@attributes_count.times do
-			@attributes << AttributeInfo.new(f)
-		end
+	def name
+		@reader.constant_pool.fetch(@attribute_name_index).bytes
 	end
 end
 
-class MethodInfo
+class FieldInfo < BaseInfo
 	attr_accessor :access_flags, :name_index, :descriptor_index, :attributes_count, :attributes
-	def initialize(f)
+	def initialize(reader, f)
+		super
 		@access_flags = f.read_u2
 		@name_index = f.read_u2
 		@descriptor_index = f.read_u2
 		@attributes_count = f.read_u2
 		@attributes = []
 		@attributes_count.times do
-			@attributes << AttributeInfo.new(f)
+			@attributes << AttributeInfo.new(reader, f)
 		end
+	end
+
+	def name
+		@reader.constant_pool.fetch(@name_index).bytes
+	end
+end
+
+class MethodInfo < BaseInfo
+	attr_accessor :access_flags, :name_index, :descriptor_index, :attributes_count, :attributes
+	def initialize(reader, f)
+		super
+		@access_flags = f.read_u2
+		@name_index = f.read_u2
+		@descriptor_index = f.read_u2
+		@attributes_count = f.read_u2
+		@attributes = []
+		@attributes_count.times do
+			@attributes << AttributeInfo.new(reader, f)
+		end
+	end
+
+	def name
+		@reader.constant_pool.fetch(@name_index).bytes
 	end
 end
 
 class JavaClassReader
+	attr_reader :constant_pool, :fields, :methods
+	
 	def initialize(file)
 		@file = file
 	end
@@ -139,24 +164,8 @@ class JavaClassReader
 		read_fields
 		@methods_count = @file.read_u2
 		read_methods
-=begin
-    u4             magic;
-    u2             minor_version;
-    u2             major_version;
-    u2             constant_pool_count;
-    cp_info        constant_pool[constant_pool_count-1];
-    u2             access_flags;
-    u2             this_class;
-    u2             super_class;
-    u2             interfaces_count;
-    u2             interfaces[interfaces_count];
-    u2             fields_count;
-    field_info     fields[fields_count];
-    u2             methods_count;
-    method_info    methods[methods_count];
-    u2             attributes_count;
-    attribute_info attributes[attributes_count];
-=end
+		@attributes_count = @file.read_u2
+		read_attributes
 	end
 
 	private
@@ -176,7 +185,7 @@ class JavaClassReader
 			constant_type_id = @file.read_u1
 			constant_class = JavaConstantClasses[constant_type_id]
 			#puts constant_class		
-			constant = constant_class.new(@file)
+			constant = constant_class.new(self, @file)
 			@constant_pool << constant
 		end
 	end
@@ -188,17 +197,24 @@ class JavaClassReader
 
 	def read_fields
 		@fields = []
-		@fields_count.times { @fields << FieldInfo.new(@file) }
+		@fields_count.times { @fields << FieldInfo.new(self, @file) }
 	end
 
 	def read_methods
 		@methods = []
-		@methods_count.times { @methods << MethodInfo.new(@file) }
+		@methods_count.times { @methods << MethodInfo.new(self, @file) }
+	end
+
+	def read_attributes
+		@attributes = []
+		@attributes_count.times { @attributes << AttributeInfo.new(self, @file) }
 	end
 end
 
 BigEndianFile.open("DoWhileExample.class", "rb") do |f|
 	reader = JavaClassReader.new(f)
 	reader.read
-	puts reader.inspect
+	m = reader.methods[1]
+	puts m.name
+	m.attributes.each {|a| puts a.name }
 end
