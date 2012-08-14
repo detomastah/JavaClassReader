@@ -1,25 +1,3 @@
-=begin
-
-    u4             magic;
-    u2             minor_version;
-    u2             major_version;
-    u2             constant_pool_count;
-    cp_info        constant_pool[constant_pool_count-1];
-    u2             access_flags;
-    u2             this_class;
-    u2             super_class;
-    u2             interfaces_count;
-    u2             interfaces[interfaces_count];
-    u2             fields_count;
-    field_info     fields[fields_count];
-    u2             methods_count;
-    method_info    methods[methods_count];
-    u2             attributes_count;
-    attribute_info attributes[attributes_count];
-
-=end
-
-
 class BigEndianFile < File
 	def read_u4
 		self.read(4).unpack("N").first
@@ -104,6 +82,42 @@ JavaConstantClasses = {
 	18 => :CONSTANT_InvokeDynamic
 }
 
+class AttributeInfo
+	attr_accessor :attribute_name_index, :attribute_length, :info
+	def initialize(f)
+		@attribute_name_index = f.read_u2
+		@attribute_length = f.read_u4
+		@info = f.read(@attribute_length)
+	end
+end
+
+class FieldInfo
+	attr_accessor :access_flags, :name_index, :descriptor_index, :attributes_count, :attributes
+	def initialize(f)
+		@access_flags = f.read_u2
+		@name_index = f.read_u2
+		@descriptor_index = f.read_u2
+		@attributes_count = f.read_u2
+		@attributes = []
+		@attributes_count.times do
+			@attributes << AttributeInfo.new(f)
+		end
+	end
+end
+
+class MethodInfo
+	attr_accessor :access_flags, :name_index, :descriptor_index, :attributes_count, :attributes
+	def initialize(f)
+		@access_flags = f.read_u2
+		@name_index = f.read_u2
+		@descriptor_index = f.read_u2
+		@attributes_count = f.read_u2
+		@attributes = []
+		@attributes_count.times do
+			@attributes << AttributeInfo.new(f)
+		end
+	end
+end
 
 class JavaClassReader
 	def initialize(file)
@@ -114,11 +128,35 @@ class JavaClassReader
 		read_magic
 		@minor = @file.read_u2
 		read_major
-		@pool_count = @file.read_u2
+		@constant_pool_count = @file.read_u2
 		read_constant_pool
 		@access_flags = @file.read_u2
 		@this_class = @file.read_u2
 		@super_class = @file.read_u2
+		@interfaces_count = @file.read_u2
+		read_interfaces
+		@fields_count = @file.read_u2
+		read_fields
+		@methods_count = @file.read_u2
+		read_methods
+=begin
+    u4             magic;
+    u2             minor_version;
+    u2             major_version;
+    u2             constant_pool_count;
+    cp_info        constant_pool[constant_pool_count-1];
+    u2             access_flags;
+    u2             this_class;
+    u2             super_class;
+    u2             interfaces_count;
+    u2             interfaces[interfaces_count];
+    u2             fields_count;
+    field_info     fields[fields_count];
+    u2             methods_count;
+    method_info    methods[methods_count];
+    u2             attributes_count;
+    attribute_info attributes[attributes_count];
+=end
 	end
 
 	private
@@ -134,7 +172,7 @@ class JavaClassReader
 
 	def read_constant_pool
 		@constant_pool = [nil] #zero index is not used, since indexing starts from 1 to pool_count - 1
-		(@pool_count - 1).times do
+		(@constant_pool_count - 1).times do
 			constant_type_id = @file.read_u1
 			constant_class = JavaConstantClasses[constant_type_id]
 			#puts constant_class		
@@ -143,7 +181,20 @@ class JavaClassReader
 		end
 	end
 
-	
+	def read_interfaces
+		@interfaces = []
+		@interfaces_count.times { @interfaces << @file.read_u2 }
+	end
+
+	def read_fields
+		@fields = []
+		@fields_count.times { @fields << FieldInfo.new(@file) }
+	end
+
+	def read_methods
+		@methods = []
+		@methods_count.times { @methods << MethodInfo.new(@file) }
+	end
 end
 
 BigEndianFile.open("DoWhileExample.class", "rb") do |f|
