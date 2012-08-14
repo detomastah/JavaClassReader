@@ -1,14 +1,14 @@
 module JavaClassFile
 	class BaseInfo
-		def initialize(reader, f)
-			@reader = reader
+		def initialize(class_data, f)
+			@class_data = class_data
 		end
 	end
 
 	class FieldRefInfo < BaseInfo
 		attr_accessor :class_index, :name_and_type_index
 
-		def initialize(reader, f)
+		def initialize(class_data, f)
 			super
 			@class_index = f.read_u2
 			@name_and_type_index = f.read_u2
@@ -24,7 +24,7 @@ module JavaClassFile
 	class ClassInfo < BaseInfo
 		attr_accessor :name_index
 
-		def initialize(reader, f)
+		def initialize(class_data, f)
 			super
 			@name_index = f.read_u2
 		end
@@ -33,7 +33,7 @@ module JavaClassFile
 	class StringInfo < BaseInfo
 		attr_accessor :string_index
 
-		def initialize(reader, f)
+		def initialize(class_data, f)
 			super
 			@string_index = f.read_u2
 		end
@@ -42,7 +42,7 @@ module JavaClassFile
 	class Utf8Info < BaseInfo
 		attr_accessor :length, :bytes
 
-		def initialize(reader, f)
+		def initialize(class_data, f)
 			super
 			@length = f.read_u2;
 			@bytes = f.read(@length)
@@ -53,7 +53,7 @@ module JavaClassFile
 	class NameAndTypeInfo < BaseInfo
 		attr_accessor :name_index, :descriptor_index
 
-		def initialize(reader, f)
+		def initialize(class_data, f)
 			super
 			@name_index = f.read_u2;
 			@descriptor_index = f.read_u2
@@ -62,7 +62,7 @@ module JavaClassFile
 
 	class AttributeInfo < BaseInfo
 		attr_accessor :attribute_name_index, :attribute_length, :info
-		def initialize(reader, f)
+		def initialize(class_data, f)
 			super
 			@attribute_name_index = f.read_u2
 			@attribute_length = f.read_u4
@@ -70,13 +70,13 @@ module JavaClassFile
 		end
 
 		def name
-			@reader.constant_pool.fetch(@attribute_name_index).bytes
+			@class_data.constant_pool.fetch(@attribute_name_index).bytes
 		end
 	end
 
 	class FieldInfo < BaseInfo
 		attr_accessor :access_flags, :name_index, :descriptor_index, :attributes_count, :attributes
-		def initialize(reader, f)
+		def initialize(class_data, f)
 			super
 			@access_flags = f.read_u2
 			@name_index = f.read_u2
@@ -84,18 +84,18 @@ module JavaClassFile
 			@attributes_count = f.read_u2
 			@attributes = []
 			@attributes_count.times do
-				@attributes << AttributeInfo.new(reader, f)
+				@attributes << AttributeInfo.new(class_data, f)
 			end
 		end
 
 		def name
-			@reader.constant_pool.fetch(@name_index).bytes
+			@class_data.constant_pool.fetch(@name_index).bytes
 		end
 	end
 
 	class MethodInfo < BaseInfo
 		attr_accessor :access_flags, :name_index, :descriptor_index, :attributes_count, :attributes
-		def initialize(reader, f)
+		def initialize(class_data, f)
 			super
 			@access_flags = f.read_u2
 			@name_index = f.read_u2
@@ -103,12 +103,12 @@ module JavaClassFile
 			@attributes_count = f.read_u2
 			@attributes = []
 			@attributes_count.times do
-				@attributes << AttributeInfo.new(reader, f)
+				@attributes << AttributeInfo.new(class_data, f)
 			end
 		end
 
 		def name
-			@reader.constant_pool.fetch(@name_index).bytes
+			@class_data.constant_pool.fetch(@name_index).bytes
 		end
 	end
 
@@ -130,8 +130,8 @@ module JavaClassFile
 			18 => :CONSTANT_InvokeDynamic
 		}
 
-		def self.produce(constant_type_id, reader, file)
-			@@classes.fetch(constant_type_id).new(reader, file)
+		def self.produce(constant_type_id, class_data, file)
+			@@classes.fetch(constant_type_id).new(class_data, file)
 		end
 	end
 

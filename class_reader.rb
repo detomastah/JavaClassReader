@@ -15,7 +15,7 @@ module JavaClassFile
 		end
 	end
 
-	class Reader
+	class ClassData
 		attr_reader :constant_pool, :fields, :methods
 
 		def read(file_path)
@@ -84,8 +84,8 @@ module JavaClassFile
 end
 
 
-reader = JavaClassFile::Reader.new
-reader.read("DoWhileExample.class")
-m = reader.methods[1]
+class_data = JavaClassFile::ClassData.new
+class_data.read("DoWhileExample.class")
+m = class_data.methods[1]
 puts m.name
 m.attributes.each {|a| puts a.name }
