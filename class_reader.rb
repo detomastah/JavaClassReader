@@ -1,7 +1,7 @@
 require 'class_file_items'
 
 module JavaClassFile
-	class BigEndianFile < File
+	module BigEndianMethods
 		def read_u4
 			self.read(4).unpack("N").first
 		end
@@ -13,6 +13,10 @@ module JavaClassFile
 		def read_u1
 			self.read(1).unpack("C").first
 		end
+	end
+	
+	class BigEndianFile < File
+		include BigEndianMethods
 	end
 
 	class ClassData
@@ -78,7 +82,7 @@ module JavaClassFile
 
 		def read_attributes
 			@attributes = []
-			@attributes_count.times { @attributes << AttributeInfo.new(self, @file) }
+			@attributes_count.times { @attributes << AttributeInfoFactory.produce(self, self, @file) }
 		end
 	end
 end
@@ -86,6 +90,6 @@ end
 
 class_data = JavaClassFile::ClassData.new
 class_data.read("DoWhileExample.class")
-m = class_data.methods[1]
-puts m.name
-m.attributes.each {|a| puts a.name }
+#m = class_data.methods[1]
+#puts m.name
+#m.attributes.each {|a| puts a.name }

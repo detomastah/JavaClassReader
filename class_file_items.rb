@@ -1,3 +1,5 @@
+require 'stringio'
+
 module JavaClassFile
 	class BaseInfo
 		def initialize(class_data, f)
@@ -61,16 +63,47 @@ module JavaClassFile
 	end
 
 	class AttributeInfo < BaseInfo
-		attr_accessor :attribute_name_index, :attribute_length, :info
 		def initialize(class_data, f)
 			super
-			@attribute_name_index = f.read_u2
 			@attribute_length = f.read_u4
-			@info = f.read(@attribute_length)
+			read_info(f)
 		end
 
-		def name
-			@class_data.constant_pool.fetch(@attribute_name_index).bytes
+		private
+		def read_info(f)
+			f.read(@attribute_length)
+		end
+	end
+
+	class CodeAttributeInfo < AttributeInfo
+		attr_accessor :max_stack, :max_locals, :code, :exception_table, :attributes
+
+		def read_info(f)
+			@max_stack = f.read_u2
+			@max_locals = f.read_u2
+			code_length = f.read_u4
+			@code = f.read(code_length)
+			exception_table_length = f.read_u2
+			f.read(exception_table_length)
+			attributes_count = f.read_u2
+			@attributes = []
+			attributes_count.times do
+				@attributes << AttributeInfoFactory.produce(self, @class_data, f)
+			end
+		end
+	end
+
+	class AttributeInfoFactory
+		def self.produce(caller_obj, class_data, f)
+			attribute_name_index = f.read_u2
+			attribute_name = class_data.constant_pool.fetch(attribute_name_index).bytes
+			begin
+				attribute_class = JavaClassFile.const_get(attribute_name + "AttributeInfo")
+			rescue
+				puts "\033[1;36m" + "No class #{attribute_name} for #{caller_obj.class}" + "\033[0m"
+				attribute_class = AttributeInfo
+			end
+			attribute_class.new(class_data, f)
 		end
 	end
 
@@ -84,7 +117,7 @@ module JavaClassFile
 			@attributes_count = f.read_u2
 			@attributes = []
 			@attributes_count.times do
-				@attributes << AttributeInfo.new(class_data, f)
+				@attributes << AttributeInfoFactory.produce(self, class_data, f)
 			end
 		end
 
@@ -103,7 +136,7 @@ module JavaClassFile
 			@attributes_count = f.read_u2
 			@attributes = []
 			@attributes_count.times do
-				@attributes << AttributeInfo.new(class_data, f)
+				@attributes << AttributeInfoFactory.produce(self, class_data, f)
 			end
 		end
 
@@ -126,7 +159,7 @@ module JavaClassFile
 			12 => NameAndTypeInfo,
 			1 => Utf8Info,
 			15 => :CONSTANT_MethodHandle,
-			16 => :CONSTANT_MethodType,
+ 			16 => :CONSTANT_MethodType,
 			18 => :CONSTANT_InvokeDynamic
 		}
 
@@ -134,5 +167,4 @@ module JavaClassFile
 			@@classes.fetch(constant_type_id).new(class_data, file)
 		end
 	end
-
 end
