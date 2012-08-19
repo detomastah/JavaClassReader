@@ -143,6 +143,10 @@ module JavaClassFile
 		def name
 			@class_data.constant_pool.fetch(@name_index).bytes
 		end
+
+		def code
+			@code ||= @attributes.find {|a| a.is_a?(CodeAttributeInfo)}.code
+		end
 	end
 
 	class ConstantInfoFactory
